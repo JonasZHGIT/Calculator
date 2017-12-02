@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<link type="text/css" rel="stylesheet" href="reset.css" />
+	<style>
+	.container {
+		position: relative;
+		top: 15%;
+		margin: 0 auto;
+		font-size: 0.25rem;
+		width: 16.2em;
+	}
+	.keyboard-container td {
+		border: 1px solid #dcdfe6;
+		text-align: center;
+		height: 2em;
+		padding: 1em;
+		cursor: pointer;
+	}
+	.screen-container {
+		font-size: 0.4rem;
+		width: 10.13em;
+		height: 2em;
+		border: 1px solid #dcdfe6;
+		border-bottom: 0;
+	}
+	.keyboard-container td div {
+		width: 2em;
+	}
+	.screen {
+		display: block;
+		box-sizing: border-box;
+		padding: 0.5em 0.5em 0;
+		height: 100%;
+		vertical-align: text-bottom;
+		text-align: right;
+	}
+	.active, .equal {
+		background-color: #ffcc99;
+	}
+    </style>
+</head>
+<body>
+	<div id="app" class="container">
+		<div class="screen-container">
+			<calculator-screen class="screen" :result="calculated"></calculator-screen>
+		</div>
+		<div class="keyboard-container">
+    		<calculator-keyboard @keyinput="numberInput" @keydelete="deletion" @keyreset="reset" @keysymble="symble" @keypercent="percent" @keyequal="equal"></calculator-keyboard>
+    	</div>
+	</div>
+	<script src="https://unpkg.com/vue"></script>
+	<script>
+		Vue.component('calculator-screen', {
+			template: `<span>{{ result }}</span>`,
+			props: ['result']
+		});
+		Vue.component('calculator-keyboard', {
+			template: `
+			<table>
+    			<tr>
+        			<td @click="keyDelete"><div>DEL</div></td>
+            		<td><div>+/-</div></td>
+            		<td @click="keyPercent"><div>%</div></td>
+            		<td @click="keySymble(1)" :class="{ active: limit === 1 }"><div>÷</div></td>
+    			</tr>
+    			<tr>
+    			    <td @click="keyInput"><div>7</div></td>
+    				<td @click="keyInput"><div>8</div></td>
+    				<td @click="keyInput"><div>9</div></td>
+    				<td @click="keySymble(2)" :class="{ active: limit === 2 }"><div>×</div></td>
+    			</tr>
+    			<tr>
+    			    <td @click="keyInput"><div>4</div></td>
+    				<td @click="keyInput"><div>5</div></td>
+    				<td @click="keyInput"><div>6</div></td>
+    				<td @click="keySymble(3)" :class="{ active: limit === 3 }"><div>-</div></td>
+    			</tr>
+    			<tr>
+    			    <td @click="keyInput"><div>1</div></td>
+    				<td @click="keyInput"><div>2</div></td>
+    				<td @click="keyInput"><div>3</div></td>
+    				<td @click="keySymble(4)" :class="{ active: limit === 4 }"><div>+</div></td>
+    			</tr>
+    			<tr>
+    			    <td @click="keyReset"><div>AC</div></td>
+    				<td @click="keyInput"><div>0</div></td>
+    				<td><div>.</div></td>
+    				<td class="equal" @click="keyEqual"><div>=</div></td>
+    			</tr>
+			</table>
+			`,
+			data: function(){
+				return {
+					limit: 0
+				};
+			},
+			methods: {
+				keyInput: function() {
+					this.$emit('keyinput', event.currentTarget.children[0].innerText);
+				},
+				keyDelete: function() {
+					this.$emit('keydelete');
+				},
+				keyReset: function() {
+					this.$emit('keyreset');
+					this.limit = 0;
+				},
+				keySymble: function(num) {
+					this.$emit('keysymble', event.currentTarget.children[0].innerText);
+					this.limit = num;
+				},
+				keyPercent: function() {
+					this.$emit('keypercent');
+				},
+				keyEqual: function() {
+					this.$emit('keyequal');
+					this.limit = 0;
+				}
+			}
+		});
+		var calculator = new Vue({
+			el: "#app",
+			data: {
+				pattern: /[\+\-\×\÷]/,
+				calculated: 0,
+				temp: {
+					fstNum: '',
+					sndNum: '',
+					symble: ''
+				}
+			},
+			methods: {
+				backToZero: function() {
+					let processing = this.temp.fstNum + this.temp.symble + this.temp.sndNum;
+					this.calculated = isNaN(eval(processing.replace('×', '*').replace('÷', '/')))?'ERROR':eval(processing.replace('×', '*').replace('÷', '/'));
+					this.temp.sndNum = '';
+				},
+				numberInput: function(param) {
+					if(this.temp.symble === '') {
+						if(this.calculated === 0) {
+							this.temp.fstNum = param;
+						} else {
+							this.temp.fstNum += param;
+						}
+						this.calculated = this.temp.fstNum;
+					} else {
+						if(this.temp.sndNum === '') {
+							this.temp.sndNum = param;
+						} else {
+							this.temp.sndNum += param;
+						}
+						this.calculated = this.temp.sndNum;
+					}
+				},
+				deletion: function() {
+					let strLength = this.calculated.length;
+					if(this.calculated !== 0) {
+						if(strLength === 1) {
+							this.calculated = 0;
+						} else {
+							this.calculated = this.calculated.slice(0, strLength-1);
+						}
+					}
+				},
+				reset: function() {
+					this.calculated = 0;
+					this.temp.fstNum = '';
+					this.temp.sndNum = '';
+					this.temp.symble = '';
+				},
+				symble: function(param) {
+					if(this.temp.symble === '') {
+						if(this.calculated === 0) {
+							this.temp.fstNum = 0;
+						}
+						this.temp.symble = param;
+					} else {
+						if(this.temp.sndNum === '') {
+							this.temp.sndNum = this.temp.fstNum;
+						}
+						this.backToZero();
+						this.temp.fstNum = this.calculated === 'ERROR'?'':this.calculated;
+						this.temp.symble = param;
+					}
+				},
+				equal: function() {
+					if(this.temp.symble !== '') {
+						if(this.temp.sndNum === '') {
+							this.temp.sndNum = this.temp.fstNum;
+						}
+						this.backToZero();
+						this.temp.fstNum = '';
+						this.temp.symble = '';
+					}
+				},
+				percent: function() {
+					this.calculated /= 100;
+				}
+			}
+		});
+	</script>
+</body>
+</html>
