@@ -35,6 +35,8 @@
 		height: 100%;
 		vertical-align: text-bottom;
 		text-align: right;
+		overflow: hidden;
+		white-space: nowrap;
 	}
 	.active, .equal {
 		background-color: #ffcc99;
@@ -53,6 +55,7 @@
     	<div>symbol is {{temp.symbol}}</div>
     	<div>second value is {{temp.sndNum}} {{typeof(temp.sndNum)}}</div>
     	<div>Phase is {{phase}}</div>
+    	<div>result length is {{calculated.length}}</div>
 	</div>
 	<script src="https://unpkg.com/vue"></script>
 	<script>
@@ -137,38 +140,44 @@
 					symbol: ''
 				},
 				phase: '0',
-				type: '0',
 				limit: ''
 			},
 			methods: {
 				numberInput: function(param) {
 					switch (this.phase) {
-						case '0':
-						case '4':
-						    this.calculated = param;
-						    this.temp.fstNum = this.calculated;
-						    if(param !== '0') {
-						    	this.phase = '1';
-						    }
-						    break;
-						case '1':
-						    this.calculated += param;
-						    this.temp.fstNum = this.calculated;
-						    break;
-						case '2':
-						    this.calculated = param;
-						    this.temp.sndNum = this.calculated;
-						    if(param != '0') {
-						    	this.phase = '3';
-						    }
-						    break;
-						case '3':
-						    this.calculated += param;
-						    this.temp.sndNum = this.calculated;
-						    break;
-						default: 
-						    return false;
-					}
+    					case '0':
+    					case '4':
+    					    this.calculated = param;
+    					    this.temp.fstNum = this.calculated;
+    					    if(param !== '0') {
+    					    	this.phase = '1';
+    					    }
+    					    break;
+    					case '1':
+    					    if(this.calculated.length < 15) {
+    					    	this.calculated += param;
+    					        this.temp.fstNum = this.calculated;
+    					    }
+    					    break;
+    					case '2':
+    					    this.calculated = param;
+    					    this.temp.sndNum = this.calculated;
+    					    this.phase = '3';
+    					    break;
+    					case '3':
+    					    if(this.calculated.length < 15) {
+    					    	if(this.calculated !== '0') {
+    					    		this.calculated += param;
+    					            this.temp.sndNum = this.calculated;
+    					    	} else {
+    					    		this.calculated = param;
+    					    		this.temp.sndNum = this.calculated;
+    					    	}
+    					    }
+    					    break;
+    					default: 
+    					    return false;
+    				}
 				},
 				deletion: function() {
 					switch (this.phase) {
@@ -190,24 +199,29 @@
 					this.temp.sndNum = '0';
 					this.temp.symbol = '';
 					this.phase = '0';
-					this.type = '0';
 					this.limit = '';
 				},
 				symbol: function(param) {
-					this.temp.symbol = param;
-				    this.limit = param;
 					switch(this.phase) {
 						case '0':
 						case '1':
 						case '2':
+    						this.temp.symbol = param;
+    				        this.limit = param;
 						    this.phase = '2';
 						    break;
 						case '3':
-						    this.phase = '4';
+						    this.calculation();
+						    this.temp.fstNum = this.calculated === 'ERROR'? '0':this.calculated;
+						    this.temp.symbol = param;
+    				        this.limit = param;
+						    this.phase = '2';
 						    break;
 						case '4':
+						    this.temp.fstNum = this.calculated === 'ERROR'? '0':this.calculated;
+						    this.temp.symbol = param;
+    				        this.limit = param;
 						    this.phase = '2';
-						    this.temp.fstNum = this.calculated;
 						    break;
 						default:
 						    return false;
@@ -291,12 +305,57 @@
 					}
 				},
 				calculation: function() {
-					let processing = this.temp.fstNum + this.temp.symbol + this.temp.sndNum;
-					this.calculated = isNaN(eval(processing.replace('×', '*').replace('÷', '/')))?'ERROR':eval(processing.replace('×', '*').replace('÷', '/')) + '';
+					if(!this.temp.fstNum.match(/\./) && !this.temp.sndNum.match(/\./)) {
+						let processing = this.temp.fstNum + this.temp.symbol + this.temp.sndNum;
+    					this.calculated = isNaN(eval(processing.replace('×', '*').replace('÷', '/')))?'ERROR':eval(processing.replace('×', '*').replace('÷', '/')) + '';
+					} else {
+						let fstPoint = this.temp.fstNum.search(/\./) > 0?this.temp.fstNum.length - this.temp.fstNum.search(/\./) - 1:0;
+						let sndPoint = this.temp.sndNum.search(/\./) > 0?this.temp.sndNum.length - this.temp.sndNum.search(/\./) - 1:0;
+						let fstBase = Math.pow(10, fstPoint);
+						let sndBase = Math.pow(10, sndPoint);
+						let base = Math.max(fstBase, sndBase);
+						let processing = this.temp.fstNum * base + this.temp.symbol + this.temp.sndNum * base;
+						this.calculated = isNaN(eval(processing.replace('×', '*').replace('÷', '/')))?'ERROR':eval(processing.replace('×', '*').replace('÷', '/')) + '';
+						switch(this.temp.symbol) {
+							case '+':
+							case '-':
+							    this.calculated = this.calculated/base + '';
+							    break;
+							case '×':
+							    this.calculated = this.calculated/Math.pow(base, 2) + '';
+							    break;
+							default:
+							    return false;
+						}
+					}
+					this.longResult();
 					this.temp.fstNum = '0';
 					this.temp.sndNum = '0';
 					this.temp.symbol = '';
 					this.limit = '';
+				},
+				longResult: function() {
+					if(this.calculated.length > 15) {
+    					let ePos = this.calculated.search(/e/);
+        				if(ePos > 0) {
+        					let sliceLen = 15 - this.calculated.length + ePos;
+        					let arr = this.calculated.split('e');
+        					console.log(sliceLen);
+        					console.log(this.calculated.split('e')[0].slice(0, sliceLen));
+        					this.calculated = arr[0].slice(0, sliceLen) + 'e' + arr[1];
+        				} else {
+        					let pointPos = this.calculated.indexOf(/\./);
+        					let eNum = this.calculated > 0?this.calculated.slice(0, pointPos).length:this.calculated.slice(1, pointPos).length;
+        					let sliceLen = 15 - (eNum + '').length - 2;
+        					let tempNum = eNum - (this.calculated.length - sliceLen);
+        					console.log(eNum);
+        					console.log(sliceLen);
+        					console.log(tempNum);
+        					console.log(this.calculated.slice(0, sliceLen));
+        					console.log(Math.pow(10, tempNum));
+        					this.calculated = this.calculated.slice(0, sliceLen) / Math.pow(10, tempNum) + 'e+' + eNum;
+        				}
+    				}
 				},
 				back: function() {
 					let strLen = this.calculated.length;
