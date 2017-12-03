@@ -47,8 +47,12 @@
 			<calculator-screen class="screen" :result="calculated"></calculator-screen>
 		</div>
 		<div class="keyboard-container">
-    		<calculator-keyboard @keyinput="numberInput" @keydelete="deletion" @keyreset="reset" @keysymble="symble" @keypercent="percent" @keyequal="equal"></calculator-keyboard>
+    		<calculator-keyboard :limit-sym="limit" @keyinput="numberInput" @keydelete="deletion" @keyreset="reset" @keysymbol="symbol" @keypercent="percent" @keyequal="equal" @keyswitch="switchSymbol" @keypoint="pointInput"></calculator-keyboard>
     	</div>
+    	<div>first value is {{temp.fstNum}} {{typeof(temp.fstNum)}}</div>
+    	<div>symbol is {{temp.symbol}}</div>
+    	<div>second value is {{temp.sndNum}} {{typeof(temp.sndNum)}}</div>
+    	<div>Phase is {{phase}}</div>
 	</div>
 	<script src="https://unpkg.com/vue"></script>
 	<script>
@@ -61,39 +65,39 @@
 			<table>
     			<tr>
         			<td @click="keyDelete"><div>DEL</div></td>
-            		<td><div>+/-</div></td>
+            		<td @click="keySwitch"><div>+/-</div></td>
             		<td @click="keyPercent"><div>%</div></td>
-            		<td @click="keySymble(1)" :class="{ active: limit === 1 }"><div>÷</div></td>
+            		<td @click="keySymbol" :class="{ active: limitSym === '÷' }"><div>÷</div></td>
     			</tr>
     			<tr>
     			    <td @click="keyInput"><div>7</div></td>
     				<td @click="keyInput"><div>8</div></td>
     				<td @click="keyInput"><div>9</div></td>
-    				<td @click="keySymble(2)" :class="{ active: limit === 2 }"><div>×</div></td>
+    				<td @click="keySymbol" :class="{ active: limitSym === '×' }"><div>×</div></td>
     			</tr>
     			<tr>
     			    <td @click="keyInput"><div>4</div></td>
     				<td @click="keyInput"><div>5</div></td>
     				<td @click="keyInput"><div>6</div></td>
-    				<td @click="keySymble(3)" :class="{ active: limit === 3 }"><div>-</div></td>
+    				<td @click="keySymbol" :class="{ active: limitSym === '-' }"><div>-</div></td>
     			</tr>
     			<tr>
     			    <td @click="keyInput"><div>1</div></td>
     				<td @click="keyInput"><div>2</div></td>
     				<td @click="keyInput"><div>3</div></td>
-    				<td @click="keySymble(4)" :class="{ active: limit === 4 }"><div>+</div></td>
+    				<td @click="keySymbol" :class="{ active: limitSym === '+' }"><div>+</div></td>
     			</tr>
     			<tr>
     			    <td @click="keyReset"><div>AC</div></td>
     				<td @click="keyInput"><div>0</div></td>
-    				<td><div>.</div></td>
+    				<td @click="keyPoint"><div>.</div></td>
     				<td class="equal" @click="keyEqual"><div>=</div></td>
     			</tr>
 			</table>
 			`,
+			props: ['limitSym'],
 			data: function(){
 				return {
-					limit: 0
 				};
 			},
 			methods: {
@@ -105,98 +109,203 @@
 				},
 				keyReset: function() {
 					this.$emit('keyreset');
-					this.limit = 0;
 				},
-				keySymble: function(num) {
-					this.$emit('keysymble', event.currentTarget.children[0].innerText);
-					this.limit = num;
+				keySymbol: function() {
+					this.$emit('keysymbol', event.currentTarget.children[0].innerText);
 				},
 				keyPercent: function() {
 					this.$emit('keypercent');
 				},
 				keyEqual: function() {
 					this.$emit('keyequal');
-					this.limit = 0;
+				},
+				keySwitch: function() {
+					this.$emit('keyswitch');
+				},
+				keyPoint: function() {
+					this.$emit('keypoint');
 				}
 			}
 		});
 		var calculator = new Vue({
 			el: "#app",
 			data: {
-				pattern: /[\+\-\×\÷]/,
-				calculated: 0,
+				calculated: '0',
 				temp: {
-					fstNum: '',
-					sndNum: '',
-					symble: ''
-				}
+					fstNum: '0',
+					sndNum: '0',
+					symbol: ''
+				},
+				phase: '0',
+				type: '0',
+				limit: ''
 			},
 			methods: {
-				backToZero: function() {
-					let processing = this.temp.fstNum + this.temp.symble + this.temp.sndNum;
-					this.calculated = isNaN(eval(processing.replace('×', '*').replace('÷', '/')))?'ERROR':eval(processing.replace('×', '*').replace('÷', '/'));
-					this.temp.sndNum = '';
-				},
 				numberInput: function(param) {
-					if(this.temp.symble === '') {
-						if(this.calculated === 0) {
-							this.temp.fstNum = param;
-						} else {
-							this.temp.fstNum += param;
-						}
-						this.calculated = this.temp.fstNum;
-					} else {
-						if(this.temp.sndNum === '') {
-							this.temp.sndNum = param;
-						} else {
-							this.temp.sndNum += param;
-						}
-						this.calculated = this.temp.sndNum;
+					switch (this.phase) {
+						case '0':
+						case '4':
+						    this.calculated = param;
+						    this.temp.fstNum = this.calculated;
+						    if(param !== '0') {
+						    	this.phase = '1';
+						    }
+						    break;
+						case '1':
+						    this.calculated += param;
+						    this.temp.fstNum = this.calculated;
+						    break;
+						case '2':
+						    this.calculated = param;
+						    this.temp.sndNum = this.calculated;
+						    if(param != '0') {
+						    	this.phase = '3';
+						    }
+						    break;
+						case '3':
+						    this.calculated += param;
+						    this.temp.sndNum = this.calculated;
+						    break;
+						default: 
+						    return false;
 					}
 				},
 				deletion: function() {
-					let strLength = this.calculated.length;
-					if(this.calculated !== 0) {
-						if(strLength === 1) {
-							this.calculated = 0;
-						} else {
-							this.calculated = this.calculated.slice(0, strLength-1);
-						}
+					switch (this.phase) {
+						case '1':
+						    this.back();
+						    this.temp.fstNum = this.calculated;
+						    break;
+						case '3':
+						    this.back();
+						    this.temp.sndNum = this.calculated;
+						    break;
+						default:
+						    return false;
 					}
 				},
 				reset: function() {
-					this.calculated = 0;
-					this.temp.fstNum = '';
-					this.temp.sndNum = '';
-					this.temp.symble = '';
+					this.calculated = '0';
+					this.temp.fstNum = '0';
+					this.temp.sndNum = '0';
+					this.temp.symbol = '';
+					this.phase = '0';
+					this.type = '0';
+					this.limit = '';
 				},
-				symble: function(param) {
-					if(this.temp.symble === '') {
-						if(this.calculated === 0) {
-							this.temp.fstNum = 0;
-						}
-						this.temp.symble = param;
-					} else {
-						if(this.temp.sndNum === '') {
-							this.temp.sndNum = this.temp.fstNum;
-						}
-						this.backToZero();
-						this.temp.fstNum = this.calculated === 'ERROR'?'':this.calculated;
-						this.temp.symble = param;
+				symbol: function(param) {
+					this.temp.symbol = param;
+				    this.limit = param;
+					switch(this.phase) {
+						case '0':
+						case '1':
+						case '2':
+						    this.phase = '2';
+						    break;
+						case '3':
+						    this.phase = '4';
+						    break;
+						case '4':
+						    this.phase = '2';
+						    this.temp.fstNum = this.calculated;
+						    break;
+						default:
+						    return false;
 					}
 				},
 				equal: function() {
-					if(this.temp.symble !== '') {
-						if(this.temp.sndNum === '') {
-							this.temp.sndNum = this.temp.fstNum;
-						}
-						this.backToZero();
-						this.temp.fstNum = '';
-						this.temp.symble = '';
+					switch(this.phase) {
+						case '2':
+						    this.temp.sndNum = this.temp.fstNum;
+						    this.calculation();
+						    this.phase = '4';
+						    break;
+						case '3':
+						    this.calculation();
+						    this.phase = '4';
+						    break;
+						default: 
+						    return false;
 					}
 				},
 				percent: function() {
-					this.calculated /= 100;
+					switch(this.phase) {
+						case '1':
+						    this.calculated = this.calculated/100 + '';
+						    this.temp.fstNum = this.calculated;
+						    break;
+						case '2':
+						    if(this.calculated !== '0') {
+						    	this.calculated = this.calculated/100 + '';
+						        this.temp.fstNum = this.calculated;
+						    }
+						    break;
+						case '3':
+						    this.calculated = this.calculated/100 + '';
+						    this.temp.sndNum = this.calculated;
+						    break;
+						case '4':
+						    this.calculated = this.calculated/100 + '';
+						    break;
+						default: 
+						    return false;
+					}
+				},
+				switchSymbol: function() {
+					switch(this.phase) {
+						case '1':
+						case '2':
+						    this.calculated = 0 - this.calculated + '';
+						    this.temp.fstNum = this.calculated;
+						    break;
+						case '3':
+						    this.calculated = 0 - this.calculated + '';
+						    this.temp.sndNum = this.calculated;
+						    break;
+						case '4':
+						    this.calculated = 0 - this.calculated + '';
+						    break;
+						default: 
+						    return false;
+					}
+				},
+				pointInput: function() {
+					switch(this.phase) {
+						case '0':
+						case '4':
+						    this.calculated = '0.';
+						    this.phase = '1';
+						    break;
+						case '1':
+						case '3':
+						    if(!this.calculated.match(/\./)) {
+						    	this.calculated += '.';
+						    }
+						    break;
+						case '2':
+						    this.calculated = '0.';
+						    this.phase = '3';
+						    break;
+						default:
+						    return false;
+					}
+				},
+				calculation: function() {
+					let processing = this.temp.fstNum + this.temp.symbol + this.temp.sndNum;
+					this.calculated = isNaN(eval(processing.replace('×', '*').replace('÷', '/')))?'ERROR':eval(processing.replace('×', '*').replace('÷', '/')) + '';
+					this.temp.fstNum = '0';
+					this.temp.sndNum = '0';
+					this.temp.symbol = '';
+					this.limit = '';
+				},
+				back: function() {
+					let strLen = this.calculated.length;
+				    if(strLen === 1 || (strLen === 2 && (this.calculated.indexOf('0') === 0 || this.calculated.indexOf('-') === 0)) || (strLen === 3 && this.calculated === '-0.')) {
+				    	this.calculated = '0';
+				    	this.phase = this.phase - 1 + '';
+				    } else {
+				    	this.calculated = this.calculated.slice(0, strLen-1);
+				    }
 				}
 			}
 		});
